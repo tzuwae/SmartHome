@@ -10,7 +10,8 @@
 #define port  12345			// target server TCP socket port
 #define host  "192.168.137.1"	// target server ip or dns
 #define serverretry 5
-
+/****************VAR****************/
+bool isAthorized = false;
 WiFiClient client;
 
 void setup() {
@@ -66,8 +67,7 @@ void setup() {
 		delay(1000);
 		if(i==WiFitimeout-1)
 		{
-			Serial.println("");
-			Serial.println("WiFi connection failed");
+			wifiConnectionerror();
 		}
 	}
 }
@@ -77,4 +77,16 @@ void setup() {
  {	
 	 Serial.println("Main loop routine");
 	 delay(1000);
+ }
+
+ void wifiConnectionerror()
+ {
+	 while(1)
+	 {
+		 Serial.print("An error occurred while connect to "); 
+		 Serial.print(ssid);
+		 Serial.println(", reset ESP8266 to reconnect.");
+		 delay(1000);
+	 }
+	 
  }
