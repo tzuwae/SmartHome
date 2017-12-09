@@ -8,9 +8,9 @@ dbServer="localhost"
 dbUser="user"
 dbPassword="0000"
 dbInuse="test"
+dbTable="espdb"
 db = pymysql.connect(dbServer, dbUser, dbPassword, dbInuse)
 cursor = db.cursor()
-
 
 
 def handle(connection, address):
@@ -33,7 +33,7 @@ def handle(connection, address):
             logger.debug("Received data %r", data)
             #ClientTX = str(data)
             #connection.sendall(ClientTX[2:4:1].encode())
-            connection.sendall(data)
+            connection.sendall("AuthOK!".encode()+data)
             data=data.strip()
             data=str(data.decode())
 
@@ -48,6 +48,7 @@ def handle(connection, address):
                     sql = """INSERT INTO espdb VALUES ('""" + str(data) + """',""" + """'""" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + """');"""
                     print("New client:" + str(data))
                 else:
+                    sql = """UPDATE espdb SET Time='""" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + """' WHERE MAC='""" + str(data) + """';"""
                     sql = """UPDATE espdb SET Time='""" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + """' WHERE MAC='""" + str(data) + """';"""
 
                 print(sql)
