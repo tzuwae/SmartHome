@@ -84,11 +84,14 @@ OLEDDisplayUi ui     ( &display );
 #define host  "192.168.137.1"	// target server ip or dns
 #define serverretry 5
 /****************VAR****************/
+#define ISRTime 5000
 bool isAthorized = false;
+bool isInit = false; 
+int isrCounter = 0;
 WiFiClient client;
 
 String dpline;
-/*
+/* 
 void msOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
   display->setTextAlignment(TEXT_ALIGN_RIGHT);
   display->setFont(ArialMT_Plain_10);
@@ -224,9 +227,10 @@ void setup() {
 			Serial.print("connecting to Server:");
 			Serial.println(host);
 			strip.begin();
-			colorWipe(strip.Color(255, 0, 0), 50); // Red
-			colorWipe(strip.Color(0, 255, 0), 50); // Green
-			colorWipe(strip.Color(0, 0, 255), 50); // Blue
+			colorWipe(strip.Color(0, 0, 1), 100); // Red
+			colorWipe(strip.Color(0, 1, 0), 100); // Green
+			colorWipe(strip.Color(1, 0, 2), 100); // Blue
+			colorWipe(strip.Color(1, 1, 1), 50);
 			
 			for(int a=0;a<serverretry;a++)
 			{
@@ -278,6 +282,13 @@ void loop() {
     // Don't do stuff if you are below your
     // time budget.
     delay(remainingTimeBudget);
+	isrCounter = isrCounter + remainingTimeBudget;
+	if(isrCounter >= ISRTime)
+	{
+		Serial.println(isrCounter);
+		isrCounter = 0;
+	}
+
 	if(Serial.available()>0)
 	{
 		int a = Serial.read();
