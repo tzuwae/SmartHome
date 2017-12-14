@@ -1,103 +1,170 @@
 #include <ESP8266WiFi.h>
-
-/****************WiFi setup****************/
-
-
-/**
- * The MIT License (MIT)
- *
- * Copyright (c) 2016 by Daniel Eichhorn
- * Copyright (c) 2016 by Fabrice Weinberg
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- */
-
- // Include the correct display library
- // For a connection via I2C using Wire include
- #include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
- #include "SSD1306.h" // alias for `#include "SSD1306Wire.h"`
- // or #include "SH1106.h" alis for `#include "SH1106Wire.h"`
- // For a connection via I2C using brzo_i2c (must be installed) include
- // #include <brzo_i2c.h> // Only needed for Arduino 1.6.5 and earlier
- // #include "SSD1306Brzo.h"
- // #include "SH1106Brzo.h"
- // For a connection via SPI include
- // #include <SPI.h> // Only needed for Arduino 1.6.5 and earlier
- // #include "SSD1306Spi.h"
- // #include "SH1106SPi.h"
-
-// Include the UI lib
-#include "OLEDDisplayUi.h"
-
-// Include custom images
+#include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
+#include "SSD1306.h" // alias for `#include "SSD1306Wire.h"
+#include "OLEDDisplayUi.h"// Include the UI lib
 #include "images.h"
 #include <Adafruit_NeoPixel.h>
-// Use the corresponding display class:
 
-// Initialize the OLED display using SPI
-// D5 -> CLK
-// D7 -> MOSI (DOUT)
-// D0 -> RES
-// D2 -> DC
-// D8 -> CS
-// SSD1306Spi        display(D0, D2, D8);
-// or
-// SH1106Spi         display(D0, D2);
 
-// Initialize the OLED display using brzo_i2c
-// D3 -> SDA
-// D5 -> SCL
-// SSD1306Brzo display(0x3c, D3, D5);
-// or
-// SH1106Brzo  display(0x3c, D3, D5);
-
-// Initialize the OLED display using Wire library
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(14, 2, NEO_GRB + NEO_KHZ800);
-SSD1306  display(0x3c, 5, 4);
-
-// SH1106 display(0x3c, D3, D5);
-
-OLEDDisplayUi ui     ( &display );
-
+/****************WiFi setup****************/
 #define ssid  "TZUWAE-X1C"
 #define password "12345678"
-#define WiFitimeout 20
+#define WiFitimeout 50
 /****************server setup****************/
 #define port  12345			// target server TCP socket port
 #define host  "192.168.137.1"	// target server ip or dns
 #define serverretry 5
+/****************UI setup****************/
+#define frameCount 5
 /****************VAR****************/
 #define ISRTime 5000
 bool isAthorized = false;
 bool isInit = false; 
 int isrCounter = 0;
-WiFiClient client;
-
 String dpline;
-/* 
-void msOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
-  display->setTextAlignment(TEXT_ALIGN_RIGHT);
-  display->setFont(ArialMT_Plain_10);
-  display->drawString(128, 0, String(millis()));
+
+// Initialize the OLED display using Wire library
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(14, 2, NEO_GRB + NEO_KHZ800);
+SSD1306  display(0x3c, 5, 4);
+OLEDDisplayUi ui     ( &display );
+WiFiClient client;
+FrameCallback frames[] = { drawFrame1, drawFrame2, drawFrame3, drawFrame4, drawFrame5 };
+
+void setup() {
+	Serial.begin(115200);
+	Serial.println();
+	displaySetup();
+	display.displayOn();
+	/****************starting WiFi connection****************/
+  	Serial.println();
+	Serial.print("Connecting to WiFi:");
+	Serial.println(ssid);
+	WiFi.begin(ssid, password);
+
+	for(int i=0;i<WiFitimeout;i++)
+	{		
+		Serial.print(".");
+		
+		if(WiFi.status() == WL_CONNECTED)
+		{
+			Serial.println("");
+			Serial.println("WiFi connected");  
+			Serial.print("Local IP address:");
+			Serial.println(WiFi.localIP());
+			Serial.print("connecting to Server:");
+			Serial.println(host);
+			strip.begin();
+			colorWipe(strip.Color(0, 0, 1), 100); // Red
+			colorWipe(strip.Color(0, 1, 0), 100); // Green
+			colorWipe(strip.Color(1, 0, 2), 100); // Blue
+			colorWipe(strip.Color(1, 1, 1), 50);
+			
+			for(int a=0;a<serverretry;a++)
+			{
+				if (!client.connect(host, port))
+				{
+					Serial.println("connection failed, try again...");
+					continue;
+				}
+				Serial.println("Server connection successful!");
+				client.println(WiFi.macAddress());
+				delay(200);
+
+				if (client.available() > 0)
+				{
+					String line = client.readStringUntil('\r');
+					dpline=line;
+					Serial.print("Server:");
+					Serial.println(line);
+					client.stop();
+					break;
+				}
+				break;
+			}
+			break;
+		}
+
+		delay(1000);
+		if(i==WiFitimeout-1)
+		{
+			Serial.println("WIFI ERROR!");
+		}
+	}
+
+
+
+	
+
 }
-*/
+
+
+void loop() {
+  int remainingTimeBudget = ui.update();
+  if (remainingTimeBudget > 0) {
+    delay(remainingTimeBudget);
+	isrCounter = isrCounter + remainingTimeBudget;
+	if(isrCounter >= ISRTime)
+	{
+		timeISR();
+		isrCounter = 0;
+	}
+
+	if(Serial.available()>0)
+	{
+		int a = Serial.read();
+		
+		Serial.println(a);
+		if(a==49)
+		{
+			Serial.println("Next Page");
+			ui.nextFrame();
+		}
+		if(a==50)
+		{
+			Serial.println("Previous Page");
+			ui.previousFrame();
+		}
+		if(a==51)
+		{
+			Serial.println("swithc to Frame");
+			//ui.switchToFrame(2);
+			dpline = "hello";
+		}
+	}
+  }
+}
+
+/****************ISR code****************/
+void timeISR()
+{
+	Serial.println("timer ISR");
+}
+
+void colorWipe(uint32_t c, uint8_t wait) {
+  for(uint16_t i=0; i<strip.numPixels(); i++) {
+    strip.setPixelColor(i, c);
+    strip.show();
+    delay(wait);
+  }
+}
+
+/****************subroutine UI setup****************/
+void displaySetup()
+{
+	display.setContrast(0);
+	ui.setTargetFPS(60);
+	ui.setTimePerTransition(100);
+	ui.disableAutoTransition();
+	ui.setActiveSymbol(activeSymbol);
+	ui.setInactiveSymbol(inactiveSymbol);
+	ui.setIndicatorDirection(LEFT_RIGHT);
+	ui.setFrameAnimation(SLIDE_LEFT);
+	ui.setFrames(frames,frameCount);
+	ui.init();
+	display.flipScreenVertically();
+}
+
+/****************subroutine UI Update****************/
 
 void drawFrame1(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   // draw an xbm image.
@@ -150,204 +217,4 @@ void drawFrame4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 void drawFrame5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
 	display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->drawString(64 + x, 22 + y, dpline);
-}
-
-// This array keeps function pointers to all frames
-// frames are the single views that slide in
-FrameCallback frames[] = { drawFrame1, drawFrame2, drawFrame3, drawFrame4, drawFrame5 };
-
-// how many frames are there?
-int frameCount = 5;
-
-// Overlays are statically drawn on top of a frame eg. a clock
-//OverlayCallback overlays[] = { msOverlay };
-int overlaysCount = 1;
-
-
-void setup() {
-	// Initialize all pixels to 'off'
-  Serial.begin(115200);
-  Serial.println();
-  Serial.println();
-
-	// The ESP is capable of rendering 60fps in 80Mhz mode
-	// but that won't give you much time for anything else
-	// run it in 160Mhz mode or just set it to 30 fps
-  display.setContrast(0);
-  ui.setTargetFPS(60);
-  ui.setTimePerTransition(100);
-  ui.disableAutoTransition();
-	// Customize the active and inactive symbol
-  ui.setActiveSymbol(activeSymbol);
-  ui.setInactiveSymbol(inactiveSymbol);
-  // You can change this to
-  // TOP, LEFT, BOTTOM, RIGHT
-  ui.setIndicatorPosition(BOTTOM);
-
-  // Defines where the first frame is located in the bar.
-  ui.setIndicatorDirection(LEFT_RIGHT);
-
-  // You can change the transition that is used
-  // SLIDE_LEFT, SLIDE_RIGHT, SLIDE_UP, SLIDE_DOWN
-  ui.setFrameAnimation(SLIDE_LEFT);
-
-  // Add frames
-  ui.setFrames(frames, frameCount);
-
-  // Add overlays
-  //ui.setOverlays(overlays, overlaysCount);
-
-  // Initialising the UI will init the display too.
-  ui.init();
-
-  display.flipScreenVertically();
-
-
-  
-
-  /****************starting WiFi connection****************/
-  
-  //strip.show(); 
-  
-	Serial.println();
-	Serial.print("Connecting to WiFi:");
-	Serial.println(ssid);
-	WiFi.begin(ssid, password);
-
-	for(int i=0;i<WiFitimeout;i++)
-	{		
-		Serial.print(".");
-		
-		if(WiFi.status() == WL_CONNECTED)
-		{
-			Serial.println("");
-			Serial.println("WiFi connected");  
-			Serial.print("Local IP address:");
-			Serial.println(WiFi.localIP());
-			Serial.print("connecting to Server:");
-			Serial.println(host);
-			strip.begin();
-			colorWipe(strip.Color(0, 0, 1), 100); // Red
-			colorWipe(strip.Color(0, 1, 0), 100); // Green
-			colorWipe(strip.Color(1, 0, 2), 100); // Blue
-			colorWipe(strip.Color(1, 1, 1), 50);
-			
-			for(int a=0;a<serverretry;a++)
-			{
-				if (!client.connect(host, port))
-				{
-					Serial.println("connection failed, try again...");
-					continue;
-				}
-				Serial.println("Server connection successful!");
-				client.println(WiFi.macAddress());
-				delay(200);
-
-				if (client.available() > 0)
-				{
-					String line = client.readStringUntil('\r');
-					dpline=line;
-					Serial.print("Server:");
-					Serial.println(line);
-					client.stop();
-
-
-
-
-					break;
-				}
-				break;
-			}
-			break;
-		}
-
-		delay(1000);
-		if(i==WiFitimeout-1)
-		{
-			Serial.println("WIFI ERROR!");
-		}
-	}
-
-
-
-	
-
-}
-
-
-void loop() {
-  int remainingTimeBudget = ui.update();
-  if (remainingTimeBudget > 0) {
-    // You can do some work here
-    // Don't do stuff if you are below your
-    // time budget.
-    delay(remainingTimeBudget);
-	isrCounter = isrCounter + remainingTimeBudget;
-	if(isrCounter >= ISRTime)
-	{
-		Serial.println(isrCounter);
-		isrCounter = 0;
-	}
-
-	if(Serial.available()>0)
-	{
-		int a = Serial.read();
-		
-		Serial.println(a);
-		if(a==49)
-		{
-			Serial.println("Next Page");
-			ui.nextFrame();
-		}
-		if(a==50)
-		{
-			Serial.println("Previous Page");
-			ui.previousFrame();
-			for(int a=0;a<serverretry;a++)
-			{
-				if (!client.connect(host, port))
-				{
-					Serial.println("connection failed, try again...");
-					continue;
-				}
-				Serial.println("Server connection successful!");
-				client.println(WiFi.macAddress());
-				delay(200);
-
-				if (client.available() > 0)
-				{
-					String line = client.readStringUntil('\r');
-					dpline=line;
-					Serial.print("Server:");
-					Serial.println(line);
-					client.stop();
-
-
-
-
-					break;
-				}
-				break;
-			}
-		}
-		if(a==51)
-		{
-			Serial.println("swithc to Frame");
-			//ui.switchToFrame(2);
-			dpline = "hello";
-			colorWipe(strip.Color(255, 0, 0), 50); // Red
-			colorWipe(strip.Color(0, 255, 0), 50); // Green
-			colorWipe(strip.Color(0, 0, 255), 50); // Blue
-		}
-	}
-  }
-}
-
-
-void colorWipe(uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, c);
-    strip.show();
-    delay(wait);
-  }
 }
