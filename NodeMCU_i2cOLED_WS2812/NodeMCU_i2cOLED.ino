@@ -20,11 +20,12 @@
 /****************UI setup****************/
 #define frameCount 5
 /****************VAR****************/
-#define ISRTime 5000
+#define ISRTime 10000
 bool isAthorized = false;
 bool isInit = false; 
 int isrCounter = 0;
 String dpline;
+String overlayString = "";
 unsigned long t = 0;
 
 // Initialize the OLED display using Wire library
@@ -33,7 +34,8 @@ SSD1306  display(0x3c, 5, 4);
 OLEDDisplayUi ui     ( &display );
 WiFiClient client;
 FrameCallback frames[] = { drawFrame1, drawFrame2, drawFrame3, drawFrame4, drawFrame5 };
-
+OverlayCallback overlays[] = { msOverlay };
+int overlaysCount = 1;
 void setup() {
 	Serial.begin(SERIAL_BAUDRATE);
 	Serial.println();
@@ -125,28 +127,30 @@ void loop()
 void timeISR()
 {
 	Serial.println("timer ISR");
+	overlayString = "Updating...";
+	ui.update();
 	for(int a=0;a<serverretry;a++)
-			{
-				if (!client.connect(host, port))
-				{
-					Serial.println("connection failed, try again...");
-					continue;
-				}
-				Serial.println("Server connection successful!");
-				client.println(WiFi.macAddress());
-				delay(50);
-
-				if (client.available() > 0)
-				{
-					String line = client.readStringUntil('\r');
-					dpline=line;
-					Serial.print("Server:");
-					Serial.println(line);
-					client.stop();
-					break;
-				}
-				break;
-			}
+	{
+		if (!client.connect(host, port))
+		{
+			Serial.println("connection failed, try again...");
+			continue;
+		}
+		Serial.println("Server connection successful!");
+		client.println(WiFi.macAddress());
+		delay(80);
+		if (client.available() > 0)
+		{
+			String line = client.readStringUntil('\r');
+			dpline=line;
+			Serial.print("Server:");
+			Serial.println(line);
+			client.stop();
+			break;
+		}
+		break;
+	}
+	overlayString = "";
 }
 
 void SerialISR()
@@ -173,7 +177,7 @@ void SerialISR()
 
 void rotaryEncoderChanged(){ // when CLK_PIN is FALLING
   unsigned long temp = millis();
-  if(temp - t < 30) // ¥h¼u¸õ
+  if(temp - t < 30)
     return;
   t = temp;  
   if(digitalRead(DT_PIN) == HIGH)
@@ -201,6 +205,7 @@ void displaySetup()
 	ui.setInactiveSymbol(inactiveSymbol);
 	ui.setIndicatorDirection(LEFT_RIGHT);
 	ui.setFrameAnimation(SLIDE_LEFT);
+	ui.setOverlays(overlays, overlaysCount);
 	ui.setFrames(frames,frameCount);
 	ui.init();
 	display.flipScreenVertically();
@@ -263,5 +268,11 @@ void drawFrame5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 	display->drawString(64 + x, 22 + y, dpline);
 }
 
+void msOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) 
+{
+  display->setTextAlignment(TEXT_ALIGN_RIGHT);
+  display->setFont(ArialMT_Plain_10);
+  display->drawString(128, 0, overlayString);
+}
 
 /****************NeoPixel subroutine************/
