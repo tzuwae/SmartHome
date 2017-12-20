@@ -5,11 +5,14 @@
 #include "images.h"
 #include <Adafruit_NeoPixel.h>
 
-
+/****************System setup****************/
+#define SERIAL_BAUDRATE 115200
+#define CLK_PIN 14 // 定義連接腳位
+#define DT_PIN 12
 /****************WiFi setup****************/
 #define ssid  "TZUWAE-X1C"
 #define password "12345678"
-#define WiFitimeout 50
+#define WiFitimeout 20
 /****************server setup****************/
 #define port  12345			// target server TCP socket port
 #define host  "192.168.137.1"	// target server ip or dns
@@ -22,6 +25,7 @@ bool isAthorized = false;
 bool isInit = false; 
 int isrCounter = 0;
 String dpline;
+unsigned long t = 0;
 
 // Initialize the OLED display using Wire library
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(14, 2, NEO_GRB + NEO_KHZ800);
@@ -31,7 +35,7 @@ WiFiClient client;
 FrameCallback frames[] = { drawFrame1, drawFrame2, drawFrame3, drawFrame4, drawFrame5 };
 
 void setup() {
-	Serial.begin(115200);
+	Serial.begin(SERIAL_BAUDRATE);
 	Serial.println();
 	displaySetup();
 	display.displayOn();
@@ -41,10 +45,13 @@ void setup() {
 	Serial.println(ssid);
 	WiFi.begin(ssid, password);
 
+	attachInterrupt(CLK_PIN, rotaryEncoderChanged, FALLING);
+	pinMode(CLK_PIN, INPUT_PULLUP);
+	pinMode(DT_PIN, INPUT_PULLUP);
+
 	for(int i=0;i<WiFitimeout;i++)
 	{		
 		Serial.print(".");
-		
 		if(WiFi.status() == WL_CONNECTED)
 		{
 			Serial.println("");
@@ -54,10 +61,10 @@ void setup() {
 			Serial.print("connecting to Server:");
 			Serial.println(host);
 			strip.begin();
-			colorWipe(strip.Color(0, 0, 1), 100); // Red
-			colorWipe(strip.Color(0, 1, 0), 100); // Green
-			colorWipe(strip.Color(1, 0, 2), 100); // Blue
-			colorWipe(strip.Color(1, 1, 1), 50);
+			colorWipe(strip.Color(0, 0, 100), 40); // Red
+			colorWipe(strip.Color(0, 100, 0), 40); // Green
+			colorWipe(strip.Color(100, 0, 0), 40); // Blue
+			colorWipe(strip.Color(10, 10, 10), 40);
 			
 			for(int a=0;a<serverretry;a++)
 			{
@@ -90,47 +97,27 @@ void setup() {
 			Serial.println("WIFI ERROR!");
 		}
 	}
-
-
-
-	
-
 }
 
 
-void loop() {
-  int remainingTimeBudget = ui.update();
-  if (remainingTimeBudget > 0) {
-    delay(remainingTimeBudget);
-	isrCounter = isrCounter + remainingTimeBudget;
-	if(isrCounter >= ISRTime)
-	{
-		timeISR();
-		isrCounter = 0;
-	}
+void loop()
+{
+	int remainingTimeBudget = ui.update();
 
-	if(Serial.available()>0)
+	if (remainingTimeBudget > 0)
 	{
-		int a = Serial.read();
-		
-		Serial.println(a);
-		if(a==49)
+		delay(remainingTimeBudget);
+		isrCounter = isrCounter + remainingTimeBudget;		
+		if(isrCounter >= ISRTime)
 		{
-			Serial.println("Next Page");
-			ui.nextFrame();
+			timeISR();
+			isrCounter = 0;
 		}
-		if(a==50)
+
+		if(Serial.available()>0)
 		{
-			Serial.println("Previous Page");
-			ui.previousFrame();
+			SerialISR();
 		}
-		if(a==51)
-		{
-			Serial.println("swithc to Frame");
-			//ui.switchToFrame(2);
-			dpline = "hello";
-		}
-	}
   }
 }
 
@@ -138,7 +125,63 @@ void loop() {
 void timeISR()
 {
 	Serial.println("timer ISR");
+	for(int a=0;a<serverretry;a++)
+			{
+				if (!client.connect(host, port))
+				{
+					Serial.println("connection failed, try again...");
+					continue;
+				}
+				Serial.println("Server connection successful!");
+				client.println(WiFi.macAddress());
+				delay(50);
+
+				if (client.available() > 0)
+				{
+					String line = client.readStringUntil('\r');
+					dpline=line;
+					Serial.print("Server:");
+					Serial.println(line);
+					client.stop();
+					break;
+				}
+				break;
+			}
 }
+
+void SerialISR()
+{
+	int a = Serial.read();		
+	Serial.println(a);
+	if(a==49)
+	{
+		Serial.println("Next Page");
+		ui.nextFrame();
+	}
+	if(a==50)
+	{
+		Serial.println("Previous Page");
+		ui.previousFrame();
+	}
+	if(a==51)
+	{
+		Serial.println("swithc to Frame");
+	//ui.switchToFrame(2);
+		dpline = "hello";
+	}
+}
+
+void rotaryEncoderChanged(){ // when CLK_PIN is FALLING
+  unsigned long temp = millis();
+  if(temp - t < 30) // 去彈跳
+    return;
+  t = temp;  
+  if(digitalRead(DT_PIN) == HIGH)
+	  ui.nextFrame();
+  else
+	  ui.previousFrame();
+}
+
 
 void colorWipe(uint32_t c, uint8_t wait) {
   for(uint16_t i=0; i<strip.numPixels(); i++) {
@@ -151,9 +194,8 @@ void colorWipe(uint32_t c, uint8_t wait) {
 /****************subroutine UI setup****************/
 void displaySetup()
 {
-	display.setContrast(0);
 	ui.setTargetFPS(60);
-	ui.setTimePerTransition(100);
+	ui.setTimePerTransition(80);
 	ui.disableAutoTransition();
 	ui.setActiveSymbol(activeSymbol);
 	ui.setInactiveSymbol(inactiveSymbol);
@@ -214,7 +256,12 @@ void drawFrame4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
   display->drawStringMaxWidth(0 + x, 20 + y, 128, "Lorem ipsum\n dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore.");
 }
 
-void drawFrame5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+void drawFrame5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y)
+{
+	display->setFont(ArialMT_Plain_10);
 	display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(64 + x, 22 + y, dpline);
+	display->drawString(64 + x, 22 + y, dpline);
 }
+
+
+/****************NeoPixel subroutine************/

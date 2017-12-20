@@ -33,7 +33,8 @@ def handle(connection, address):
             logger.debug("Received data %r", data)
             #ClientTX = str(data)
             #connection.sendall(ClientTX[2:4:1].encode())
-            connection.sendall("AuthOK!".encode()+data)
+            #connection.sendall("AuthOK!".encode()+data)
+            connection.sendall(str(time.strftime("%a %b %d %H:%M %Y", time.localtime())).encode() )
             data=data.strip()
             data=str(data.decode())
 
