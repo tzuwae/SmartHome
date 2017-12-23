@@ -7,12 +7,14 @@
 
 /****************System setup****************/
 #define SERIAL_BAUDRATE 115200
-#define CLK_PIN 14 // 定義連接腳位
+#define CLK_PIN 14
 #define DT_PIN 12
 /****************WiFi setup****************/
 #define ssid  "TZUWAE-X1C"
 #define password "12345678"
 #define WiFitimeout 20
+#define TCPprocessTime 100
+bool wifiConnect = false;
 /****************server setup****************/
 #define port  12345			// target server TCP socket port
 #define host  "192.168.137.1"	// target server ip or dns
@@ -41,12 +43,13 @@ void setup() {
 	Serial.println();
 	displaySetup();
 	display.displayOn();
+	strip.begin();
+	colorWipe(strip.Color(30, 0, 30), 25); // Red
 	/****************starting WiFi connection****************/
   	Serial.println();
 	Serial.print("Connecting to WiFi:");
 	Serial.println(ssid);
 	WiFi.begin(ssid, password);
-
 	attachInterrupt(CLK_PIN, rotaryEncoderChanged, FALLING);
 	pinMode(CLK_PIN, INPUT_PULLUP);
 	pinMode(DT_PIN, INPUT_PULLUP);
@@ -62,11 +65,9 @@ void setup() {
 			Serial.println(WiFi.localIP());
 			Serial.print("connecting to Server:");
 			Serial.println(host);
-			strip.begin();
-			colorWipe(strip.Color(0, 0, 100), 40); // Red
-			colorWipe(strip.Color(0, 100, 0), 40); // Green
-			colorWipe(strip.Color(100, 0, 0), 40); // Blue
-			colorWipe(strip.Color(10, 10, 10), 40);
+			colorWipe(strip.Color(0, 0, 50), 25); // Blue
+			colorWipe(strip.Color(0, 50, 0), 25); // Green
+			colorWipe(strip.Color(100, 100, 100), 25);
 			
 			for(int a=0;a<serverretry;a++)
 			{
@@ -120,7 +121,7 @@ void loop()
 		{
 			SerialISR();
 		}
-  }
+	}
 }
 
 /****************ISR code****************/
@@ -138,7 +139,7 @@ void timeISR()
 		}
 		Serial.println("Server connection successful!");
 		client.println(WiFi.macAddress());
-		delay(80);
+		delay(TCPprocessTime);
 		if (client.available() > 0)
 		{
 			String line = client.readStringUntil('\r');
@@ -151,6 +152,7 @@ void timeISR()
 		break;
 	}
 	overlayString = "";
+	colorWipe(strip.Color(100, 100, 100), 25);
 }
 
 void SerialISR()
@@ -177,9 +179,11 @@ void SerialISR()
 
 void rotaryEncoderChanged(){ // when CLK_PIN is FALLING
   unsigned long temp = millis();
+  /*
   if(temp - t < 30)
     return;
-  t = temp;  
+  t = temp;
+  */
   if(digitalRead(DT_PIN) == HIGH)
 	  ui.nextFrame();
   else
@@ -218,21 +222,31 @@ void drawFrame1(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
   // Please note that everything that should be transitioned
   // needs to be drawn relative to x and y
 
-  display->drawXbm(x + 34, y + 14, WiFi_Logo_width, WiFi_Logo_height, WiFi_Logo_bits);
+  //display->drawXbm(x + 34, y + 14, WiFi_Logo_width, WiFi_Logo_height, WiFi_Logo_bits);
+  display->drawXbm(x + 18, y + 4, 80, 50, blackman);
+  
 }
 
-void drawFrame2(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+void drawFrame2(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) 
+{
   // Demonstrates the 3 included default sizes. The fonts come from SSD1306Fonts.h file
   // Besides the default fonts there will be a program to convert TrueType fonts into this format
-  display->setTextAlignment(TEXT_ALIGN_LEFT);
-  display->setFont(ArialMT_Plain_10);
-  display->drawString(0 + x, 10 + y, "Arial 10");
+	/*
+	display->setTextAlignment(TEXT_ALIGN_LEFT);
+	display->setFont(ArialMT_Plain_10);
+	display->drawString(0 + x, 10 + y, "Arial 10");
+	display->setFont(ArialMT_Plain_16);
+	display->drawString(0 + x, 20 + y, "Arial 16");
+	display->setFont(ArialMT_Plain_24);
+	display->drawString(0 + x, 34 + y, "Arial 24");
+	*/
+	display->setFont(ArialMT_Plain_24);
+	display->setTextAlignment(TEXT_ALIGN_CENTER);
+	display->drawString(64 + x, 5 + y, dpline.substring(0,8));
+	display->setFont(ArialMT_Plain_16);
+	display->setTextAlignment(TEXT_ALIGN_CENTER);
+	display->drawString(64 + x, 32 + y, dpline.substring(8,23));
 
-  display->setFont(ArialMT_Plain_16);
-  display->drawString(0 + x, 20 + y, "Arial 16");
-
-  display->setFont(ArialMT_Plain_24);
-  display->drawString(0 + x, 34 + y, "Arial 24");
 }
 
 void drawFrame3(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
@@ -258,7 +272,7 @@ void drawFrame4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
   // Currently only spaces and "-" are allowed for wrapping
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(ArialMT_Plain_10);
-  display->drawStringMaxWidth(0 + x, 20 + y, 128, "Lorem ipsum\n dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore.");
+  display->drawStringMaxWidth(0 + x, 0 + y, 128, "Lorem ipsum\n dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore.");
 }
 
 void drawFrame5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y)

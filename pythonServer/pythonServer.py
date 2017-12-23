@@ -11,7 +11,8 @@ dbInuse="test"
 dbTable="espdb"
 db = pymysql.connect(dbServer, dbUser, dbPassword, dbInuse)
 cursor = db.cursor()
-
+todolist = "Hello world."
+txmessage =""
 
 def handle(connection, address):
     import logging
@@ -34,7 +35,9 @@ def handle(connection, address):
             #ClientTX = str(data)
             #connection.sendall(ClientTX[2:4:1].encode())
             #connection.sendall("AuthOK!".encode()+data)
-            connection.sendall(str(time.strftime("%a %b %d %H:%M %Y", time.localtime())).encode() )
+            txmessage = time.strftime("%I:%M %p%a %b %d %Y", time.localtime())
+            connection.sendall(txmessage.encode() )
+            #connection.sendall(str((time.strftime("%a %b %d %H:%M %Y", time.localtime())) + str(todolist)).encode())
             data=data.strip()
             data=str(data.decode())
 
@@ -50,7 +53,6 @@ def handle(connection, address):
                     print("New client:" + str(data))
                 else:
                     sql = """UPDATE espdb SET Time='""" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + """' WHERE MAC='""" + str(data) + """';"""
-                    sql = """UPDATE espdb SET Time='""" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + """' WHERE MAC='""" + str(data) + """';"""
 
                 print(sql)
                 cursor.execute(sql)
@@ -59,9 +61,6 @@ def handle(connection, address):
                 db.rollback()
                 print("Error: unable to fetch data")
             logger.debug("Update Database")
-
-
-
             break
 
     except socket.timeout:
