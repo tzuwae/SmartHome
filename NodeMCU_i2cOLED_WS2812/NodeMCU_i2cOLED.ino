@@ -14,6 +14,7 @@
 #define password "12345678"
 #define WiFitimeout 20
 #define TCPprocessTime 100
+#define WiFiChecktime 4
 bool wifiConnect = false;
 /****************server setup****************/
 #define port  12345			// target server TCP socket port
@@ -21,42 +22,51 @@ bool wifiConnect = false;
 #define serverretry 5
 /****************UI setup****************/
 #define frameCount 5
+/****************NEO Pixel setup****************/
+#define NEO_PIN	2
+#define NEO_PIXELS	12
 /****************VAR****************/
 #define ISRTime 10000
-bool isAthorized = false;
-bool isInit = false; 
 int isrCounter = 0;
 String dpline;
 String overlayString = "";
 unsigned long t = 0;
+int RSSI;
+/****************Flag****************/
+bool isInit = false; 
 
 // Initialize the OLED display using Wire library
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(14, 2, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEO_PIXELS, NEO_PIN, NEO_GRB + NEO_KHZ800);
 SSD1306  display(0x3c, 5, 4);
 OLEDDisplayUi ui     ( &display );
 WiFiClient client;
 FrameCallback frames[] = { drawFrame1, drawFrame2, drawFrame3, drawFrame4, drawFrame5 };
 OverlayCallback overlays[] = { msOverlay };
 int overlaysCount = 1;
+uint16_t a, j;
+
+
 void setup() {
 	Serial.begin(SERIAL_BAUDRATE);
 	Serial.println();
 	displaySetup();
 	display.displayOn();
+	ui.switchToFrame(0);
+	ui.update();
+	ui.switchToFrame(0);
 	strip.begin();
-	colorWipe(strip.Color(30, 0, 30), 25); // Red
 	/****************starting WiFi connection****************/
   	Serial.println();
 	Serial.print("Connecting to WiFi:");
 	Serial.println(ssid);
-	WiFi.begin(ssid, password);
-	attachInterrupt(CLK_PIN, rotaryEncoderChanged, FALLING);
+	WiFi.begin(ssid, password);	
 	pinMode(CLK_PIN, INPUT_PULLUP);
 	pinMode(DT_PIN, INPUT_PULLUP);
-
-	for(int i=0;i<WiFitimeout;i++)
+	pinMode(13,INPUT);
+	for(long i=0;i<WiFitimeout*(1000/WiFiChecktime);i++)
 	{		
 		Serial.print(".");
+		ui.update();
 		if(WiFi.status() == WL_CONNECTED)
 		{
 			Serial.println("");
@@ -65,6 +75,9 @@ void setup() {
 			Serial.println(WiFi.localIP());
 			Serial.print("connecting to Server:");
 			Serial.println(host);
+			ui.switchToFrame(0);
+			ui.update();
+			ui.switchToFrame(0);
 			colorWipe(strip.Color(0, 0, 50), 25); // Blue
 			colorWipe(strip.Color(0, 50, 0), 25); // Green
 			colorWipe(strip.Color(100, 100, 100), 25);
@@ -78,7 +91,7 @@ void setup() {
 				}
 				Serial.println("Server connection successful!");
 				client.println(WiFi.macAddress());
-				delay(200);
+				delay(TCPprocessTime);
 
 				if (client.available() > 0)
 				{
@@ -94,19 +107,29 @@ void setup() {
 			break;
 		}
 
-		delay(1000);
-		if(i==WiFitimeout-1)
+		delay(WiFiChecktime);
+		for(a=0; a< strip.numPixels(); a++) 
+		{
+			strip.setPixelColor(a, Wheel((( a* 256 / strip.numPixels()) + j%256) & 255));
+		}
+		strip.show();
+		j++;
+		if(i==WiFitimeout*(1000/WiFiChecktime)-1)
 		{
 			Serial.println("WIFI ERROR!");
+			colorWipe(strip.Color(100, 0, 0), 25); // Red
 		}
 	}
+	attachInterrupt(CLK_PIN, rotaryEncoderChanged, FALLING);
+	isInit=true;
 }
 
 
 void loop()
 {
 	int remainingTimeBudget = ui.update();
-
+	RSSI=WiFi.RSSI();
+	Serial.println(digitalRead(13));
 	if (remainingTimeBudget > 0)
 	{
 		delay(remainingTimeBudget);
@@ -127,9 +150,11 @@ void loop()
 /****************ISR code****************/
 void timeISR()
 {
+	colorWipe(strip.Color(10, 10, 10), 1);
 	Serial.println("timer ISR");
 	overlayString = "Updating...";
 	ui.update();
+	client.connect(host, port);
 	for(int a=0;a<serverretry;a++)
 	{
 		if (!client.connect(host, port))
@@ -152,7 +177,7 @@ void timeISR()
 		break;
 	}
 	overlayString = "";
-	colorWipe(strip.Color(100, 100, 100), 25);
+	colorWipe(strip.Color(100, 100, 100), 1);
 }
 
 void SerialISR()
@@ -221,9 +246,40 @@ void drawFrame1(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
   // draw an xbm image.
   // Please note that everything that should be transitioned
   // needs to be drawn relative to x and y
-
-  //display->drawXbm(x + 34, y + 14, WiFi_Logo_width, WiFi_Logo_height, WiFi_Logo_bits);
-  display->drawXbm(x + 18, y + 4, 80, 50, blackman);
+	if(WiFi.status() != WL_CONNECTED)
+	{
+		display->drawXbm(x + 0, y + 14, WiFi_Logo_width, WiFi_Logo_height, WiFi_Logo_bits); //x+34
+		display->drawXbm(x + 50, y + 4, 80, 50, blackman);
+	}
+	else
+	{
+		display->drawXbm(x + 0, y + 14, WiFi_Logo_width, WiFi_Logo_height, WiFi_Logo_bits); //x+34
+		
+		if(isInit)
+		{
+			if(RSSI>=-67)
+			{
+				display->drawXbm(x + 75, y + 10, 40, 40, wifi_4);
+			}
+			if(RSSI<-67 && RSSI >=-75)
+			{
+				display->drawXbm(x + 75, y + 10, 40, 40, wifi_3);
+			}
+			if(RSSI<-75 && RSSI >=-85)
+			{
+				display->drawXbm(x + 75, y + 10, 40, 40, wifi_2);
+			}
+			if(RSSI<-85)
+			{
+				display->drawXbm(x + 75, y + 10, 40, 40, wifi_1);
+			}
+		}
+		else
+		{
+			display->drawXbm(x + 50, y + 4, 80, 50, okICON);
+		}
+	}
+	
   
 }
 
@@ -290,3 +346,15 @@ void msOverlay(OLEDDisplay *display, OLEDDisplayUiState* state)
 }
 
 /****************NeoPixel subroutine************/
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+  if(WheelPos < 170) {
+    WheelPos -= 85;
+    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  WheelPos -= 170;
+  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
