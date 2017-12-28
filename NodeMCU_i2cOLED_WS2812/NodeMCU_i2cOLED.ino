@@ -9,11 +9,12 @@
 #define SERIAL_BAUDRATE 115200
 #define CLK_PIN 14
 #define DT_PIN 12
+#define PB 0
 /****************WiFi setup****************/
 #define ssid  "TZUWAE-X1C"
 #define password "12345678"
 #define WiFitimeout 20
-#define TCPprocessTime 100
+#define TCPprocessTime 500
 #define WiFiChecktime 4
 bool wifiConnect = false;
 /****************server setup****************/
@@ -34,6 +35,8 @@ unsigned long t = 0;
 int RSSI;
 /****************Flag****************/
 bool isInit = false; 
+bool PrevPBState;
+bool Light = false;
 
 // Initialize the OLED display using Wire library
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEO_PIXELS, NEO_PIN, NEO_GRB + NEO_KHZ800);
@@ -44,6 +47,7 @@ FrameCallback frames[] = { drawFrame1, drawFrame2, drawFrame3, drawFrame4, drawF
 OverlayCallback overlays[] = { msOverlay };
 int overlaysCount = 1;
 uint16_t a, j;
+
 
 
 void setup() {
@@ -62,7 +66,7 @@ void setup() {
 	WiFi.begin(ssid, password);	
 	pinMode(CLK_PIN, INPUT_PULLUP);
 	pinMode(DT_PIN, INPUT_PULLUP);
-	pinMode(13,INPUT);
+	pinMode(PB, INPUT_PULLUP);
 	for(long i=0;i<WiFitimeout*(1000/WiFiChecktime);i++)
 	{		
 		Serial.print(".");
@@ -97,6 +101,8 @@ void setup() {
 				{
 					String line = client.readStringUntil('\r');
 					dpline=line;
+					if(line=="")
+						break;
 					Serial.print("Server:");
 					Serial.println(line);
 					client.stop();
@@ -129,38 +135,41 @@ void loop()
 {
 	int remainingTimeBudget = ui.update();
 	RSSI=WiFi.RSSI();
-	Serial.println(digitalRead(13));
 	if (remainingTimeBudget > 0)
 	{
+		PrevPBState = digitalRead(PB);
 		delay(remainingTimeBudget);
 		isrCounter = isrCounter + remainingTimeBudget;		
 		if(isrCounter >= ISRTime)
 		{
 			timeISR();
 			isrCounter = 0;
-		}
-
-		if(Serial.available()>0)
+		}		
+	}
+	if(Serial.available()>0)
 		{
 			SerialISR();
 		}
-	}
+	if((digitalRead(PB)==0)&&(PrevPBState==1))
+		{
+			PB_Push();
+		}
 }
 
 /****************ISR code****************/
 void timeISR()
 {
-	colorWipe(strip.Color(10, 10, 10), 1);
 	Serial.println("timer ISR");
 	overlayString = "Updating...";
 	ui.update();
-	client.connect(host, port);
 	for(int a=0;a<serverretry;a++)
 	{
+		client.connect(host, port);
 		if (!client.connect(host, port))
 		{
 			Serial.println("connection failed, try again...");
-			continue;
+			overlayString = "Server Error";
+			return;
 		}
 		Serial.println("Server connection successful!");
 		client.println(WiFi.macAddress());
@@ -169,6 +178,11 @@ void timeISR()
 		{
 			String line = client.readStringUntil('\r');
 			dpline=line;
+			if(line=="")
+			{
+				Serial.println("Error, Unable to read string!");
+				break;
+			}
 			Serial.print("Server:");
 			Serial.println(line);
 			client.stop();
@@ -177,7 +191,6 @@ void timeISR()
 		break;
 	}
 	overlayString = "";
-	colorWipe(strip.Color(100, 100, 100), 1);
 }
 
 void SerialISR()
@@ -202,32 +215,45 @@ void SerialISR()
 	}
 }
 
-void rotaryEncoderChanged(){ // when CLK_PIN is FALLING
-  unsigned long temp = millis();
-  /*
-  if(temp - t < 30)
+void rotaryEncoderChanged()// when CLK_PIN is FALLING
+{
+	/*
+	unsigned long temp = millis();
+    if(temp - t < 30)
     return;
-  t = temp;
-  */
-  if(digitalRead(DT_PIN) == HIGH)
-	  ui.nextFrame();
-  else
-	  ui.previousFrame();
+	t = temp;
+	*/
+	if(digitalRead(DT_PIN) == HIGH)
+	{
+		ui.nextFrame();
+	}
+	else
+	{
+		ui.previousFrame();
+	}
 }
 
-
-void colorWipe(uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, c);
-    strip.show();
-    delay(wait);
-  }
+void PB_Push()
+{
+	Serial.print(digitalRead(PB));
+	Serial.println(PrevPBState);
+	if(!Light)
+	{
+		colorWipe(strip.Color(100, 100, 100), 1);
+		Light = true;
+	}
+	else
+	{
+		colorWipe(strip.Color(0, 0, 0), 1);
+		Light = false;
+	}
 }
+
 
 /****************subroutine UI setup****************/
 void displaySetup()
 {
-	ui.setTargetFPS(60);
+	ui.setTargetFPS(100);
 	ui.setTimePerTransition(80);
 	ui.disableAutoTransition();
 	ui.setActiveSymbol(activeSymbol);
@@ -357,4 +383,14 @@ uint32_t Wheel(byte WheelPos) {
   }
   WheelPos -= 170;
   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+void colorWipe(uint32_t c, uint8_t wait) 
+{
+	for(uint16_t i=0; i<strip.numPixels(); i++) 
+	{
+		strip.setPixelColor(i, c);
+		strip.show();
+		delay(wait);
+	}
 }

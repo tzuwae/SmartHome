@@ -40,7 +40,6 @@ def handle(connection, address):
             #connection.sendall(str((time.strftime("%a %b %d %H:%M %Y", time.localtime())) + str(todolist)).encode())
             data=data.strip()
             data=str(data.decode())
-
             logger.debug("Sent data")
             try:
                 sql = """SELECT * from espdb WHERE MAC='""" + str(data) + "';"
