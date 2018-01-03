@@ -58,4 +58,5 @@ C:\Users\Tzuwae\AppData\Local\Temp\VMBuilds\NodeMCU_i2cOLED\esp8266_nodemcuv2\Re
  C:\Users\Tzuwae\Documents\Arduino\libraries\esp8266-oled-ssd1306-master/OLEDDisplayFonts.h \
  C:\Users\Tzuwae\Documents\Arduino\libraries\esp8266-oled-ssd1306-master/OLEDDisplayUi.h \
  C:\Users\Tzuwae\AppData\Local\Temp\VMBuilds\NodeMCU_i2cOLED\esp8266_nodemcuv2\Release\images.h \
- C:\Users\Tzuwae\Documents\Arduino\libraries\Adafruit_NeoPixel-master/Adafruit_NeoPixel.h
+ C:\Users\Tzuwae\Documents\Arduino\libraries\Adafruit_NeoPixel-master/Adafruit_NeoPixel.h \
+ C:\Users\Tzuwae\Documents\Arduino\libraries\DHT-sensor-library-master/DHT.h

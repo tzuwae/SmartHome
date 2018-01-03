@@ -4,6 +4,7 @@
 #include "OLEDDisplayUi.h"// Include the UI lib
 #include "images.h"
 #include <Adafruit_NeoPixel.h>
+#include "DHT.h"
 
 /****************System setup****************/
 #define SERIAL_BAUDRATE 115200
@@ -26,6 +27,8 @@ bool wifiConnect = false;
 /****************NEO Pixel setup****************/
 #define NEO_PIN	2
 #define NEO_PIXELS	12
+/****************DHT11 setup****************/
+#define DHTPIN 13
 /****************VAR****************/
 #define ISRTime 10000
 int isrCounter = 0;
@@ -33,6 +36,11 @@ String dpline;
 String overlayString = "";
 unsigned long t = 0;
 int RSSI;
+float temperature;
+float humidity;
+float fahrenheit;
+float hif;
+float hic;
 /****************Flag****************/
 bool isInit = false; 
 bool PrevPBState;
@@ -45,8 +53,10 @@ OLEDDisplayUi ui     ( &display );
 WiFiClient client;
 FrameCallback frames[] = { drawFrame1, drawFrame2, drawFrame3, drawFrame4, drawFrame5 };
 OverlayCallback overlays[] = { msOverlay };
+DHT dht(DHTPIN, DHT11);
 int overlaysCount = 1;
 uint16_t a, j;
+
 
 
 
@@ -59,6 +69,7 @@ void setup() {
 	ui.update();
 	ui.switchToFrame(0);
 	strip.begin();
+	dht.begin();
 	/****************starting WiFi connection****************/
   	Serial.println();
 	Serial.print("Connecting to WiFi:");
@@ -162,6 +173,7 @@ void timeISR()
 	Serial.println("timer ISR");
 	overlayString = "Updating...";
 	ui.update();
+	readDHT11();
 	for(int a=0;a<serverretry;a++)
 	{
 		client.connect(host, port);
@@ -247,6 +259,32 @@ void PB_Push()
 		colorWipe(strip.Color(0, 0, 0), 1);
 		Light = false;
 	}
+}
+
+void readDHT11()
+{
+  humidity = dht.readHumidity();
+  // Read temperature as Celsius (the default)
+  temperature = dht.readTemperature();
+  // Read temperature as Fahrenheit (isFahrenheit = true)
+  fahrenheit = dht.readTemperature(true);
+
+  // Check if any reads failed and exit early (to try again).
+  if (isnan(humidity) || isnan(temperature) || isnan(fahrenheit)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+  // Compute heat index in Fahrenheit (the default)
+  hif = dht.computeHeatIndex(fahrenheit, humidity);
+  // Compute heat index in Celsius (isFahreheit = false)
+  hic = dht.computeHeatIndex(temperature, humidity, false);
+
+  Serial.print("Humidity: ");
+  Serial.print(humidity);
+  Serial.print(" %\t");
+  Serial.print("Heat index: ");
+  Serial.print(hic);
+  Serial.println(" *C ");
 }
 
 
