@@ -41,6 +41,8 @@ float humidity;
 float fahrenheit;
 float hif;
 float hic;
+int lightIntensity = 0;
+int PrevIntensity = 0;
 /****************Flag****************/
 bool isInit = false; 
 bool PrevPBState;
@@ -138,6 +140,7 @@ void setup() {
 		}
 	}
 	attachInterrupt(CLK_PIN, rotaryEncoderChanged, FALLING);
+	attachInterrupt(PB, PB_Push, FALLING);
 	isInit=true;
 }
 
@@ -146,9 +149,10 @@ void loop()
 {
 	int remainingTimeBudget = ui.update();
 	RSSI=WiFi.RSSI();
+	colorWipe(strip.Color(map(lightIntensity, 0, 100, 0, 255), map(lightIntensity, 0, 100, 0, 255), map(lightIntensity, 0, 100, 0, 255)), 0);
 	if (remainingTimeBudget > 0)
 	{
-		PrevPBState = digitalRead(PB);
+		//PrevPBState = digitalRead(PB);
 		delay(remainingTimeBudget);
 		isrCounter = isrCounter + remainingTimeBudget;		
 		if(isrCounter >= ISRTime)
@@ -161,10 +165,12 @@ void loop()
 		{
 			SerialISR();
 		}
+	/*
 	if((digitalRead(PB)==0)&&(PrevPBState==1))
 		{
 			PB_Push();
 		}
+		*/
 }
 
 /****************ISR code****************/
@@ -229,35 +235,59 @@ void SerialISR()
 
 void rotaryEncoderChanged()// when CLK_PIN is FALLING
 {
-	/*
-	unsigned long temp = millis();
-    if(temp - t < 30)
-    return;
-	t = temp;
-	*/
-	if(digitalRead(DT_PIN) == HIGH)
+	
+	
+	if(!Light)
 	{
-		ui.nextFrame();
+		if(digitalRead(DT_PIN) == HIGH)
+		{
+			ui.nextFrame();
+		}
+		else
+		{
+			ui.previousFrame();
+		}
 	}
-	else
+	if(Light)
 	{
-		ui.previousFrame();
+		unsigned long temp = millis();
+		if(temp - t < 30)
+		return;
+		t = temp;
+		if(digitalRead(DT_PIN) == HIGH)
+		{
+			if(lightIntensity>0)
+			{
+				lightIntensity=lightIntensity-5;
+			}
+		}
+		else
+		{
+			if(lightIntensity<100)
+			{
+				lightIntensity=lightIntensity+5;
+			}
+		}
+		Serial.println(lightIntensity);
 	}
 }
 
 void PB_Push()
 {
-	Serial.print(digitalRead(PB));
-	Serial.println(PrevPBState);
+	unsigned long temp = millis();
+	if(temp - t < 30)
+		return;
+	t = temp;
 	if(!Light)
 	{
-		colorWipe(strip.Color(100, 100, 100), 1);
 		Light = true;
+		Serial.println("Light=True");
+		ui.switchToFrame(5);
 	}
 	else
 	{
-		colorWipe(strip.Color(0, 0, 0), 1);
 		Light = false;
+		Serial.println("Light=False");
 	}
 }
 
@@ -369,37 +399,35 @@ void drawFrame2(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 
 }
 
-void drawFrame3(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-  // Text alignment demo
-  display->setFont(ArialMT_Plain_10);
-
-  // The coordinates define the left starting point of the text
-  display->setTextAlignment(TEXT_ALIGN_LEFT);
-  display->drawString(0 + x, 11 + y, "Left aligned (0,10)");
-
-  // The coordinates define the center of the text
-  display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(64 + x, 22 + y, "Center aligned (64,22)");
-
-  // The coordinates define the right end of the text
-  display->setTextAlignment(TEXT_ALIGN_RIGHT);
-  display->drawString(128 + x, 33 + y, "Right aligned (128,33)");
+void drawFrame3(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) 
+{
+	display->drawXbm(x -5, y + 3, thermometer_width, thermometer_height, thermometer_bits);
+	display->setFont(ArialMT_Plain_24);
+	display->drawString(120 + x, 15 + y, String(String(hic,1)+"*C"));
+	//display->drawXbm(x+90, y + 10, cel_width, cel_height, cel_bits);
 }
 
-void drawFrame4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-  // Demo for drawStringMaxWidth:
-  // with the third parameter you can define the width after which words will be wrapped.
-  // Currently only spaces and "-" are allowed for wrapping
-  display->setTextAlignment(TEXT_ALIGN_LEFT);
-  display->setFont(ArialMT_Plain_10);
-  display->drawStringMaxWidth(0 + x, 0 + y, 128, "Lorem ipsum\n dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore.");
+void drawFrame4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) 
+{
+	display->drawXbm(x + 5, y + 10, hygrometer_width, hygrometer_height, hygrometer_bits);
+	display->setFont(ArialMT_Plain_24);
+	display->drawString(120 + x, 15 + y, String(String(humidity,1)+" %"));
 }
 
 void drawFrame5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y)
 {
-	display->setFont(ArialMT_Plain_10);
-	display->setTextAlignment(TEXT_ALIGN_CENTER);
-	display->drawString(64 + x, 22 + y, dpline);
+	if(!Light)
+	{
+		display->drawXbm(x + 5, y + 10, lightball_width, lightball_height, lightball_bits);
+		display->setFont(ArialMT_Plain_24);
+		display->drawString(120 + x, 15 + y, String(lightIntensity)+" %");
+	}
+	else
+	{
+		display->setTextAlignment(TEXT_ALIGN_CENTER);
+		display->setFont(ArialMT_Plain_24);
+		display->drawString(64 + x, 15 + y, String(lightIntensity)+" %");
+	}
 }
 
 void msOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) 
