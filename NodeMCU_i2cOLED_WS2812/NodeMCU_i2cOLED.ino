@@ -97,7 +97,7 @@ void setup() {
 			ui.switchToFrame(0);
 			colorWipe(strip.Color(0, 0, 50), 25); // Blue
 			colorWipe(strip.Color(0, 50, 0), 25); // Green
-			colorWipe(strip.Color(100, 100, 100), 25);
+			colorWipe(strip.Color(0, 0, 0), 25);
 			
 			for(int a=0;a<serverretry;a++)
 			{
@@ -141,6 +141,7 @@ void setup() {
 	}
 	attachInterrupt(CLK_PIN, rotaryEncoderChanged, FALLING);
 	attachInterrupt(PB, PB_Push, FALLING);
+	readDHT11();
 	isInit=true;
 }
 
@@ -148,29 +149,32 @@ void setup() {
 void loop()
 {
 	int remainingTimeBudget = ui.update();
-	RSSI=WiFi.RSSI();
-	colorWipe(strip.Color(map(lightIntensity, 0, 100, 0, 255), map(lightIntensity, 0, 100, 0, 255), map(lightIntensity, 0, 100, 0, 255)), 0);
+	if(lightIntensity!=PrevIntensity)
+	{
+		colorWipe(strip.Color(map(lightIntensity, 0, 100, 0, 255), map(lightIntensity, 0, 100, 0, 255), map(lightIntensity, 0, 100, 0, 255)), 0);
+		PrevIntensity=lightIntensity;
+	}	
 	if (remainingTimeBudget > 0)
 	{
-		//PrevPBState = digitalRead(PB);
 		delay(remainingTimeBudget);
 		isrCounter = isrCounter + remainingTimeBudget;		
 		if(isrCounter >= ISRTime)
 		{
-			timeISR();
+			if(!Light)
+			{
+				timeISR();
+			}
 			isrCounter = 0;
 		}		
 	}
-	if(Serial.available()>0)
+	if(!Light)
+	{
+		if(Serial.available()>0)
 		{
 			SerialISR();
 		}
-	/*
-	if((digitalRead(PB)==0)&&(PrevPBState==1))
-		{
-			PB_Push();
-		}
-		*/
+		RSSI=WiFi.RSSI();
+	}
 }
 
 /****************ISR code****************/
@@ -217,8 +221,8 @@ void SerialISR()
 	Serial.println(a);
 	if(a==49)
 	{
-		Serial.println("Next Page");
-		ui.nextFrame();
+		Serial.println("switch to page 5");
+		ui.switchToFrame(4);
 	}
 	if(a==50)
 	{
@@ -234,9 +238,7 @@ void SerialISR()
 }
 
 void rotaryEncoderChanged()// when CLK_PIN is FALLING
-{
-	
-	
+{	
 	if(!Light)
 	{
 		if(digitalRead(DT_PIN) == HIGH)
@@ -274,21 +276,38 @@ void rotaryEncoderChanged()// when CLK_PIN is FALLING
 
 void PB_Push()
 {
+	disableISR();
 	unsigned long temp = millis();
-	if(temp - t < 30)
+	if(temp - t < 100)
 		return;
 	t = temp;
 	if(!Light)
 	{
-		Light = true;
+		Light = true;		
 		Serial.println("Light=True");
-		ui.switchToFrame(5);
+		ui.switchToFrame(4);
 	}
 	else
 	{
 		Light = false;
 		Serial.println("Light=False");
 	}
+	attachInterrupt(CLK_PIN, rotaryEncoderChanged, FALLING);
+	attachInterrupt(PB, PB_Push, FALLING);
+}
+
+void enableISR()
+{
+	attachInterrupt(CLK_PIN, rotaryEncoderChanged, FALLING);
+	attachInterrupt(PB, PB_Push, FALLING);
+	Serial.println("Allow ISR = True");
+}
+
+void disableISR()
+{
+	detachInterrupt(CLK_PIN);
+	detachInterrupt(PB);
+	Serial.println("Allow ISR = False");
 }
 
 void readDHT11()
