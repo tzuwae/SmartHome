@@ -34,6 +34,7 @@ bool wifiConnect = false;
 int isrCounter = 0;
 String dpline;
 String overlayString = "";
+String sendString;
 unsigned long t = 0;
 int RSSI;
 float temperature;
@@ -194,7 +195,10 @@ void timeISR()
 			return;
 		}
 		Serial.println("Server connection successful!");
-		client.println(WiFi.macAddress());
+		sendString = String(WiFi.macAddress()+(int)humidity+String(hic,1)+lightIntensity);
+		Serial.print("Send String:");
+		Serial.println(sendString);
+		client.println(sendString);
 		delay(TCPprocessTime);
 		if (client.available() > 0)
 		{
