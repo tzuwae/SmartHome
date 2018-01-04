@@ -35,6 +35,7 @@ int isrCounter = 0;
 String dpline;
 String overlayString = "";
 String sendString;
+String cmp="";
 unsigned long t = 0;
 int RSSI;
 float temperature;
@@ -195,7 +196,7 @@ void timeISR()
 			return;
 		}
 		Serial.println("Server connection successful!");
-		sendString = String(WiFi.macAddress()+(int)humidity+String(hic,1)+lightIntensity);
+		sendString = String(WiFi.macAddress()+"!"+String(lightIntensity)+"!"+(int)humidity+"!"+String(hic,1));
 		Serial.print("Send String:");
 		Serial.println(sendString);
 		client.println(sendString);
@@ -235,9 +236,9 @@ void SerialISR()
 	}
 	if(a==51)
 	{
-		Serial.println("swithc to Frame");
-	//ui.switchToFrame(2);
-		dpline = "hello";
+		sendString = String(WiFi.macAddress()+cmp+String(lightIntensity)+"L"+(int)humidity+String(hic,1));
+		Serial.print("Send String:");
+		Serial.println(sendString);
 	}
 }
 

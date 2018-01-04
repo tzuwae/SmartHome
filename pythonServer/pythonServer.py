@@ -40,18 +40,24 @@ def handle(connection, address):
             #connection.sendall(str((time.strftime("%a %b %d %H:%M %Y", time.localtime())) + str(todolist)).encode())
             data=data.strip()
             data=str(data.decode())
+            clientMAC, clientLight, clientHumidity, clientTemperature = data.split('!')
             logger.debug("Sent data")
             try:
-                sql = """SELECT * from espdb WHERE MAC='""" + str(data) + "';"
+                sql = """SELECT * from espdb WHERE MAC='""" + clientMAC + "';"
                 print(sql)
                 cursor.execute(sql)
                 db.commit()
                 results = cursor.fetchall()
                 if results == ():
-                    sql = """INSERT INTO espdb VALUES ('""" + str(data) + """',""" + """'""" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + """');"""
+                    sql = """INSERT INTO espdb VALUES ('""" + clientMAC + """',""" + """'""" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + """');"""
                     print("New client:" + str(data))
                 else:
-                    sql = """UPDATE espdb SET Time='""" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + """' WHERE MAC='""" + str(data) + """';"""
+                    sql = """UPDATE espdb SET 
+                    Time='""" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) \
+                    + "', light='" + clientLight \
+                    + "', humidity='" + clientHumidity \
+                    + "', temperature='" + clientTemperature \
+                    + """' WHERE MAC='""" + clientMAC + """';"""
 
                 print(sql)
                 cursor.execute(sql)
