@@ -239,23 +239,30 @@ void SerialISR()
 
 void rotaryEncoderChanged()// when CLK_PIN is FALLING
 {	
+	unsigned long temp = millis();
+	if(temp - t < 15)
+	return;
+	t = temp;
 	if(!Light)
 	{
 		if(digitalRead(DT_PIN) == HIGH)
 		{
-			ui.nextFrame();
+			ui.previousFrame();	
 		}
 		else
 		{
-			ui.previousFrame();
-		}
+			ui.nextFrame();			
+		}/*
+		unsigned long temp = millis();
+		if(temp - t < 40)
+		return;
+		t = temp;
+		ui.transitionToFrame(nowFrame);
+		*/
+		
 	}
 	if(Light)
 	{
-		unsigned long temp = millis();
-		if(temp - t < 30)
-		return;
-		t = temp;
 		if(digitalRead(DT_PIN) == HIGH)
 		{
 			if(lightIntensity>0)
@@ -276,7 +283,6 @@ void rotaryEncoderChanged()// when CLK_PIN is FALLING
 
 void PB_Push()
 {
-	disableISR();
 	unsigned long temp = millis();
 	if(temp - t < 100)
 		return;
@@ -292,8 +298,6 @@ void PB_Push()
 		Light = false;
 		Serial.println("Light=False");
 	}
-	attachInterrupt(CLK_PIN, rotaryEncoderChanged, FALLING);
-	attachInterrupt(PB, PB_Push, FALLING);
 }
 
 void enableISR()
@@ -430,7 +434,7 @@ void drawFrame4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 {
 	display->drawXbm(x + 5, y + 10, hygrometer_width, hygrometer_height, hygrometer_bits);
 	display->setFont(ArialMT_Plain_24);
-	display->drawString(120 + x, 15 + y, String(String(humidity,1)+" %"));
+	display->drawString(120 + x, 15 + y, String(String(humidity,0)+" %"));
 }
 
 void drawFrame5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y)
